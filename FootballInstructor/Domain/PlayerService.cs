@@ -83,11 +83,13 @@ namespace FootballInstructor.Domain
             
             if (isClosestToEnemyPlayer && ourDistanceToBall <= opponentDistanceToBall + 150)
             {
-                // Go for the ball
+                // Use ball interception instead of chasing current position
+                var interceptPosition = GeometryHelper.CalculateInterceptPosition(playerStatus, ballStatus);
+                
                 return new PlayerInstructions
                 {
-                    MoveToX = ballStatus.X,
-                    MoveToY = ballStatus.Y,
+                    MoveToX = interceptPosition.X,
+                    MoveToY = interceptPosition.Y,
                     MoveVelocity = 100,
                     BallTargetX = 12000,
                     BallTargetY = 4500,
@@ -98,6 +100,21 @@ namespace FootballInstructor.Domain
             // If player has the ball (very close), make a decision
             if (distanceToBall < 150)
             {
+                // Check for passing opportunities first
+                var otherAttackerNumber = playerNumber == 3 ? 4 : 3;
+                var otherAttacker = PlayerHelper.GetPlayerStatus(gameStatus, otherAttackerNumber);
+                
+                // Pass if teammate is in better position (closer to goal or more open)
+                if (otherAttacker.X > playerStatus.X + 800 && otherAttacker.X > 7000)
+                {
+                    return new PlayerInstructions
+                    {
+                        BallTargetX = otherAttacker.X + 200, // Lead the pass slightly
+                        BallTargetY = otherAttacker.Y,
+                        BallVelocity = 75
+                    };
+                }
+                
                 // If in good shooting position, shoot
                 if (playerStatus.X > 8000)
                 {
@@ -122,14 +139,34 @@ namespace FootballInstructor.Domain
             // If we don't have the ball, get into good attacking position
             if (ourDistanceToBall < opponentDistanceToBall)
             {
-                // We have possession, get into scoring position
-                var targetX = Math.Max(7000, ballStatus.X + 1000);
-                var targetY = playerNumber == 3 ? 3000 : 6000;
+                // We have possession - position for pass or goal scoring
+                var ballCarrier = ourClosestToBall;
+                
+                // If ball is in attacking third, position for goal scoring/tap-ins
+                if (ballStatus.X > 8000)
+                {
+                    var goalAreaX = 11000 + (playerNumber - 3) * 500; // Spread around goal area
+                    var goalAreaY = 4500 + (playerNumber == 3 ? -800 : 800); // One high, one low
+                    
+                    return new PlayerInstructions
+                    {
+                        MoveToX = goalAreaX,
+                        MoveToY = goalAreaY,
+                        MoveVelocity = 90
+                    };
+                }
+                
+                // Otherwise, position for receiving passes
+                var passReceiveX = Math.Max(6000, ballStatus.X + 1500); // Ahead of ball
+                var passReceiveY = ballStatus.Y + (playerNumber == 3 ? -1500 : 1500); // Spread vertically
+                
+                // Stay within field bounds
+                passReceiveY = Math.Max(1000, Math.Min(passReceiveY, 8000));
                 
                 return new PlayerInstructions
                 {
-                    MoveToX = targetX,
-                    MoveToY = targetY,
+                    MoveToX = passReceiveX,
+                    MoveToY = passReceiveY,
                     MoveVelocity = 80
                 };
             }
@@ -170,17 +207,19 @@ namespace FootballInstructor.Domain
                 var distance1ToBall = GeometryHelper.Distance(defender1, ballStatus);
                 var distance2ToBall = GeometryHelper.Distance(defender2, ballStatus);
 
-                // Closest defender goes for the ball
+                // Closest defender goes for the ball using interception
                 if ((playerNumber == 1 && distance1ToBall <= distance2ToBall) || 
                     (playerNumber == 2 && distance2ToBall < distance1ToBall))
                 {
+                    var interceptPosition = GeometryHelper.CalculateInterceptPosition(currentPlayer, ballStatus);
+                    
                     return new PlayerInstructions
                     {
-                        MoveToX = ballStatus.X,
-                        MoveToY = ballStatus.Y,
+                        MoveToX = interceptPosition.X,
+                        MoveToY = interceptPosition.Y,
                         MoveVelocity = 100,
-                        BallTargetX = 12000, // Clear towards opponent goal
-                        BallTargetY = 4500,
+                        BallTargetX = FindBestPassTarget(gameStatus, playerNumber),
+                        BallTargetY = FindBestPassTargetY(gameStatus, playerNumber),
                         BallVelocity = 80
                     };
                 }
@@ -226,27 +265,47 @@ namespace FootballInstructor.Domain
                 }
                 else
                 {
-                    // Cover the goal - position on the line between opponent and goal center
+                    // Cover the goal - position to block shots more effectively
                     var opponentX = opponentClosestToBall.X;
                     var opponentY = opponentClosestToBall.Y;
                     
-                    // Calculate the line from opponent to goal
+                    // Calculate the line from opponent to goal center
                     var lineDirectionX = goalX - opponentX;
                     var lineDirectionY = goalY - opponentY;
+                    var lineLength = Math.Sqrt(lineDirectionX * lineDirectionX + lineDirectionY * lineDirectionY);
                     
-                    // Position 60% of the way from opponent to goal (closer to goal)
-                    var blockX = opponentX + lineDirectionX * 0.6;
-                    var blockY = opponentY + lineDirectionY * 0.6;
+                    // Normalize the direction vector
+                    var normalizedX = lineDirectionX / lineLength;
+                    var normalizedY = lineDirectionY / lineLength;
                     
-                    // Ensure we stay within reasonable bounds
-                    blockX = Math.Max(200, Math.Min(blockX, 3000));
-                    blockY = Math.Max(1000, Math.Min(blockY, 8000));
+                    // Position closer to goal but with better angle coverage
+                    var blockDistance = Math.Min(1500, lineLength * 0.7); // 70% towards goal
+                    var blockX = opponentX + normalizedX * blockDistance;
+                    var blockY = opponentY + normalizedY * blockDistance;
+                    
+                    // Add slight offset to cover more angle
+                    // If opponent is to the right of goal, defender goes slightly left and vice versa
+                    var lateralOffset = 0;
+                    if (opponentY < goalY - 500) // Opponent is above goal center
+                    {
+                        lateralOffset = 300; // Move down to cover that side
+                    }
+                    else if (opponentY > goalY + 500) // Opponent is below goal center
+                    {
+                        lateralOffset = -300; // Move up to cover that side
+                    }
+                    
+                    blockY += lateralOffset;
+                    
+                    // Ensure we stay within reasonable bounds and don't go too far back
+                    blockX = Math.Max(400, Math.Min(blockX, 2500));
+                    blockY = Math.Max(1500, Math.Min(blockY, 7500));
                     
                     return new PlayerInstructions
                     {
                         MoveToX = (int)blockX,
                         MoveToY = (int)blockY,
-                        MoveVelocity = 90
+                        MoveVelocity = 95
                     };
                 }
             }
@@ -259,6 +318,47 @@ namespace FootballInstructor.Domain
                 gameStatus.YourStatus.P2Status,
                 gameStatus.YourStatus.P3Status,
                 gameStatus.YourStatus.P4Status);
+        }
+
+        private int FindBestPassTarget(GameStatusExtended gameStatus, int currentPlayer)
+        {
+            // Look for the most advanced teammate
+            var bestX = 0;
+            
+            for (int i = 1; i <= 4; i++)
+            {
+                if (i == currentPlayer) continue;
+                
+                var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
+                if (teammate.X > bestX)
+                {
+                    bestX = teammate.X;
+                }
+            }
+            
+            // If no good teammate found, pass towards attackers' area
+            return bestX > 0 ? bestX + 500 : 8000;
+        }
+
+        private int FindBestPassTargetY(GameStatusExtended gameStatus, int currentPlayer)
+        {
+            // Look for the most advanced teammate
+            var bestX = 0;
+            var bestY = 4500;
+            
+            for (int i = 1; i <= 4; i++)
+            {
+                if (i == currentPlayer) continue;
+                
+                var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
+                if (teammate.X > bestX)
+                {
+                    bestX = teammate.X;
+                    bestY = teammate.Y;
+                }
+            }
+            
+            return bestY;
         }
     }
 }
