@@ -104,25 +104,30 @@ namespace FootballInstructor.Domain
                 var otherAttackerNumber = playerNumber == 3 ? 4 : 3;
                 var otherAttacker = PlayerHelper.GetPlayerStatus(gameStatus, otherAttackerNumber);
                 
-                // Pass if teammate is in better position (closer to goal or more open)
+                // Pass if teammate is in better position AND we can pass in that direction
                 if (otherAttacker.X > playerStatus.X + 800 && otherAttacker.X > 7000)
                 {
-                    return new PlayerInstructions
+                    if (GeometryHelper.CanPlayerShootInDirection(playerStatus, otherAttacker.X, otherAttacker.Y))
                     {
-                        BallTargetX = otherAttacker.X + 200, // Lead the pass slightly
-                        BallTargetY = otherAttacker.Y,
-                        BallVelocity = 75
-                    };
+                        return new PlayerInstructions
+                        {
+                            BallTargetX = otherAttacker.X + 200, // Lead the pass slightly
+                            BallTargetY = otherAttacker.Y,
+                            BallVelocity = 75
+                        };
+                    }
                 }
                 
-                // If in good shooting position, shoot
+                // If in good shooting position, shoot (with direction limitations)
                 if (playerStatus.X > 8000)
                 {
+                    var goalTarget = GeometryHelper.GetBestShootableTarget(playerStatus, 12000, 4500);
                     var shotVelocity = Math.Min(100, 50 + (Math.Abs(playerStatus.Vx) + Math.Abs(playerStatus.Vy)) / 20);
+                    
                     return new PlayerInstructions
                     {
-                        BallTargetX = 12000,
-                        BallTargetY = 4500,
+                        BallTargetX = goalTarget.X,
+                        BallTargetY = goalTarget.Y,
                         BallVelocity = shotVelocity
                     };
                 }
@@ -322,40 +327,68 @@ namespace FootballInstructor.Domain
 
         private int FindBestPassTarget(GameStatusExtended gameStatus, int currentPlayer)
         {
-            // Look for the most advanced teammate
+            var currentPlayerStatus = PlayerHelper.GetPlayerStatus(gameStatus, currentPlayer);
             var bestX = 0;
+            var bestTeammateFound = false;
             
             for (int i = 1; i <= 4; i++)
             {
                 if (i == currentPlayer) continue;
                 
                 var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
-                if (teammate.X > bestX)
+                
+                // Endast överväg lagkamrater som vi faktiskt kan passa till
+                if (GeometryHelper.CanPlayerShootInDirection(currentPlayerStatus, teammate.X, teammate.Y))
                 {
-                    bestX = teammate.X;
+                    if (teammate.X > bestX)
+                    {
+                        bestX = teammate.X;
+                        bestTeammateFound = true;
+                    }
                 }
             }
             
-            // If no good teammate found, pass towards attackers' area
-            return bestX > 0 ? bestX + 500 : 8000;
+            // Om ingen passbar lagkamrat hittades, hitta bästa riktning att spela framåt
+            if (!bestTeammateFound)
+            {
+                var forwardTarget = GeometryHelper.GetBestShootableTarget(currentPlayerStatus, 12000, 4500);
+                return forwardTarget.X;
+            }
+            
+            // Passa lite framför lagkamraten
+            return bestX + 500;
         }
 
         private int FindBestPassTargetY(GameStatusExtended gameStatus, int currentPlayer)
         {
-            // Look for the most advanced teammate
+            var currentPlayerStatus = PlayerHelper.GetPlayerStatus(gameStatus, currentPlayer);
             var bestX = 0;
             var bestY = 4500;
+            var bestTeammateFound = false;
             
             for (int i = 1; i <= 4; i++)
             {
                 if (i == currentPlayer) continue;
                 
                 var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
-                if (teammate.X > bestX)
+                
+                // Endast överväg lagkamrater som vi faktiskt kan passa till
+                if (GeometryHelper.CanPlayerShootInDirection(currentPlayerStatus, teammate.X, teammate.Y))
                 {
-                    bestX = teammate.X;
-                    bestY = teammate.Y;
+                    if (teammate.X > bestX)
+                    {
+                        bestX = teammate.X;
+                        bestY = teammate.Y;
+                        bestTeammateFound = true;
+                    }
                 }
+            }
+            
+            // Om ingen passbar lagkamrat hittades, sikta mot centrum
+            if (!bestTeammateFound)
+            {
+                var forwardTarget = GeometryHelper.GetBestShootableTarget(currentPlayerStatus, 12000, 4500);
+                return forwardTarget.Y;
             }
             
             return bestY;

@@ -93,4 +93,91 @@ public static class GeometryHelper
         // Returnera bästa intercept-position
         return PredictBallPosition(ball, bestTime);
     }
+
+    /// <summary>
+    /// Kontrollerar om en spelare kan skjuta/passa i en specifik riktning
+    /// Antar att spelaren kan skjuta ~180 grader framåt baserat på sin rörelseriktning
+    /// </summary>
+    public static bool CanPlayerShootInDirection(PlayerStatus player, int targetX, int targetY)
+    {
+        // Beräkna spelarens rörelseriktning (om spelaren rör sig)
+        var playerSpeed = Math.Sqrt(player.Vx * player.Vx + player.Vy * player.Vy);
+        
+        // Om spelaren står stilla, anta att den kan skjuta framåt (mot högre X)
+        if (playerSpeed < 50)
+        {
+            return targetX >= player.X; // Kan bara skjuta framåt
+        }
+
+        // Beräkna vinkeln som spelaren rör sig i
+        var playerAngle = Math.Atan2(player.Vy, player.Vx);
+        
+        // Beräkna vinkeln till målet
+        var targetAngle = Math.Atan2(targetY - player.Y, targetX - player.X);
+        
+        // Beräkna skillnaden mellan vinklarna
+        var angleDifference = Math.Abs(targetAngle - playerAngle);
+        
+        // Normalisera till 0-π intervall
+        if (angleDifference > Math.PI)
+        {
+            angleDifference = 2 * Math.PI - angleDifference;
+        }
+        
+        // Spelaren kan skjuta inom ~90 grader på vardera sidan (180 grader totalt)
+        return angleDifference <= Math.PI / 2;
+    }
+
+    /// <summary>
+    /// Hittar bästa skottriktning inom spelarens möjliga skottvinkel
+    /// </summary>
+    public static (int X, int Y) GetBestShootableTarget(PlayerStatus player, int preferredX, int preferredY)
+    {
+        // Om spelaren kan skjuta direkt mot målet, gör det
+        if (CanPlayerShootInDirection(player, preferredX, preferredY))
+        {
+            return (preferredX, preferredY);
+        }
+
+        // Annars, hitta närmaste möjliga skottriktning
+        // Prova olika vinklar runt spelarens rörelseriktning
+        var playerAngle = Math.Atan2(player.Vy, player.Vx);
+        
+        // Om spelaren står stilla, rikta framåt
+        if (Math.Sqrt(player.Vx * player.Vx + player.Vy * player.Vy) < 50)
+        {
+            playerAngle = 0; // Rakt framåt (öster)
+        }
+
+        // Prova vinklar inom 90-graders intervall
+        var bestAngle = playerAngle;
+        var targetAngle = Math.Atan2(preferredY - player.Y, preferredX - player.X);
+        
+        // Välj närmaste möjliga vinkel
+        var maxAngleOffset = Math.PI / 2; // 90 grader
+        
+        if (Math.Abs(targetAngle - playerAngle) <= maxAngleOffset)
+        {
+            bestAngle = targetAngle;
+        }
+        else if (targetAngle > playerAngle)
+        {
+            bestAngle = playerAngle + maxAngleOffset;
+        }
+        else
+        {
+            bestAngle = playerAngle - maxAngleOffset;
+        }
+
+        // Beräkna ny målposition 2000cm bort i den riktningen
+        var shootDistance = 2000;
+        var newTargetX = player.X + (int)(Math.Cos(bestAngle) * shootDistance);
+        var newTargetY = player.Y + (int)(Math.Sin(bestAngle) * shootDistance);
+        
+        // Håll inom planens gränser
+        newTargetX = Math.Max(0, Math.Min(12000, newTargetX));
+        newTargetY = Math.Max(0, Math.Min(9000, newTargetY));
+        
+        return (newTargetX, newTargetY);
+    }
 }
