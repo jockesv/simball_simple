@@ -95,6 +95,137 @@ public static class GeometryHelper
     }
 
     /// <summary>
+    /// Kontrollerar om en pass från en spelare till en målposition är blockerad av motståndare
+    /// </summary>
+    public static bool IsPassBlocked(PlayerStatus passer, int targetX, int targetY, params PlayerStatus[] opponents)
+    {
+        // Beräkna passlinjen
+        var passDistance = Distance(passer.X, passer.Y, targetX, targetY);
+        
+        // Om passen är väldigt kort, anta att den går igenom
+        if (passDistance < 200) // Minska från 300 till 200
+        {
+            return false;
+        }
+
+        // Större blockering-radie för bättre detektering
+        var blockingRadius = 120; // Öka från 80 till 120cm
+
+        // Kontrollera varje motståndare
+        foreach (var opponent in opponents)
+        {
+            // Beräkna kortaste avståndet från motståndaren till passlinjen
+            var distanceToPassLine = DistanceFromPointToLine(
+                opponent.X, opponent.Y,
+                passer.X, passer.Y,
+                targetX, targetY
+            );
+
+            // Förbättrad kontroll - använd projektionsparameter istället för punkt-kontroll
+            if (distanceToPassLine < blockingRadius && IsOpponentBlockingPass(passer, targetX, targetY, opponent))
+            {
+                return true; // Passen är blockerad
+            }
+        }
+
+        return false; // Passen är fri
+    }
+
+    /// <summary>
+    /// Förbättrad kontroll för om en motståndare faktiskt blockerar en pass
+    /// </summary>
+    private static bool IsOpponentBlockingPass(PlayerStatus passer, int targetX, int targetY, PlayerStatus opponent)
+    {
+        // Beräkna passriktning som vektor
+        var passVectorX = targetX - passer.X;
+        var passVectorY = targetY - passer.Y;
+        
+        // Beräkna vektor från passerens position till motståndare
+        var toOpponentX = opponent.X - passer.X;
+        var toOpponentY = opponent.Y - passer.Y;
+        
+        // Beräkna passlinjes längd squared (för att undvika sqrt)
+        var passLengthSq = passVectorX * passVectorX + passVectorY * passVectorY;
+        
+        if (passLengthSq == 0) return false; // Ingen pass (samma position)
+        
+        // Beräkna projektionsparameter t (0 = start, 1 = slut av passlinjen)
+        var t = (toOpponentX * passVectorX + toOpponentY * passVectorY) / (double)passLengthSq;
+        
+        // Motståndaren blockerar bara om den är MELLAN start och slutpunkten
+        // Med lite marginal på båda sidor
+        return t >= -0.1 && t <= 1.1; // 10% marginal på vardera sidan
+    }
+
+    /// <summary>
+    /// Beräknar avståndet från en punkt till en linje
+    /// </summary>
+    private static double DistanceFromPointToLine(int pointX, int pointY, int lineStartX, int lineStartY, int lineEndX, int lineEndY)
+    {
+        var lineLength = Distance(lineStartX, lineStartY, lineEndX, lineEndY);
+        
+        if (lineLength == 0)
+        {
+            return Distance(pointX, pointY, lineStartX, lineStartY);
+        }
+
+        var numerator = Math.Abs((lineEndY - lineStartY) * pointX - (lineEndX - lineStartX) * pointY + lineEndX * lineStartY - lineEndY * lineStartX);
+        return numerator / lineLength;
+    }
+
+    /// <summary>
+    /// Projicerar en punkt på en linje och returnerar projektionspunkten
+    /// </summary>
+    private static (int X, int Y) ProjectPointOntoLine(int pointX, int pointY, int lineStartX, int lineStartY, int lineEndX, int lineEndY)
+    {
+        var lineVectorX = lineEndX - lineStartX;
+        var lineVectorY = lineEndY - lineStartY;
+        var pointVectorX = pointX - lineStartX;
+        var pointVectorY = pointY - lineStartY;
+
+        var lineLengthSquared = lineVectorX * lineVectorX + lineVectorY * lineVectorY;
+        
+        if (lineLengthSquared == 0)
+        {
+            return (lineStartX, lineStartY);
+        }
+
+        var t = (pointVectorX * lineVectorX + pointVectorY * lineVectorY) / (double)lineLengthSquared;
+        
+        var projX = lineStartX + t * lineVectorX;
+        var projY = lineStartY + t * lineVectorY;
+        
+        return ((int)projX, (int)projY);
+    }
+
+    /// <summary>
+    /// Kontrollerar om en punkt ligger på en linjesegment - FÖRBÄTTRAD VERSION
+    /// </summary>
+    private static bool IsPointOnLineSegment(int pointX, int pointY, int lineStartX, int lineStartY, int lineEndX, int lineEndY)
+    {
+        // Beräkna vektorer
+        var lineVectorX = lineEndX - lineStartX;
+        var lineVectorY = lineEndY - lineStartY;
+        var pointVectorX = pointX - lineStartX;
+        var pointVectorY = pointY - lineStartY;
+
+        var lineLengthSq = lineVectorX * lineVectorX + lineVectorY * lineVectorY;
+        
+        if (lineLengthSq == 0)
+        {
+            // Linje har ingen längd, kolla om punkten är på samma plats
+            return Distance(pointX, pointY, lineStartX, lineStartY) < 50; // 50cm tolerans
+        }
+
+        // Beräkna projektionsparameter
+        var t = (pointVectorX * lineVectorX + pointVectorY * lineVectorY) / (double)lineLengthSq;
+        
+        // Punkten är på linjesegmentet om t är mellan 0 och 1 (med lite tolerans)
+        var tolerance = 0.05; // 5% tolerans
+        return t >= -tolerance && t <= 1 + tolerance;
+    }
+
+    /// <summary>
     /// Kontrollerar om en spelare kan skjuta/passa i en specifik riktning
     /// Antar att spelaren kan skjuta ~180 grader framåt baserat på sin rörelseriktning
     /// </summary>

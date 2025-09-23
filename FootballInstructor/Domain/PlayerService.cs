@@ -100,26 +100,68 @@ namespace FootballInstructor.Domain
             // If player has the ball (very close), make a decision
             if (distanceToBall < 150)
             {
-                // Check for passing opportunities first
+                // AGGRESSIVE GOAL SCORING: If very close to goal, always shoot!
+                if (playerStatus.X > 10500) // In the goal area
+                {
+                    return new PlayerInstructions
+                    {
+                        BallTargetX = 12000,
+                        BallTargetY = 4500,
+                        BallVelocity = 100 // Full power shot!
+                    };
+                }
+                
+                // MEDIUM CLOSE: Prioritize shooting over passing
+                if (playerStatus.X > 9000)
+                {
+                    var goalTarget = GeometryHelper.GetBestShootableTarget(playerStatus, 12000, 4500);
+                    var shotVelocity = Math.Min(100, 70 + (Math.Abs(playerStatus.Vx) + Math.Abs(playerStatus.Vy)) / 15);
+                    
+                    return new PlayerInstructions
+                    {
+                        BallTargetX = goalTarget.X,
+                        BallTargetY = goalTarget.Y,
+                        BallVelocity = shotVelocity
+                    };
+                }
+                
+                // Check for passing opportunities (only if not too close to goal)
                 var otherAttackerNumber = playerNumber == 3 ? 4 : 3;
                 var otherAttacker = PlayerHelper.GetPlayerStatus(gameStatus, otherAttackerNumber);
                 
-                // Pass if teammate is in better position AND we can pass in that direction
-                if (otherAttacker.X > playerStatus.X + 800 && otherAttacker.X > 7000)
+                // Pass only if teammate is SIGNIFICANTLY better positioned
+                if (otherAttacker.X > playerStatus.X + 1200 && otherAttacker.X > 8000)
                 {
                     if (GeometryHelper.CanPlayerShootInDirection(playerStatus, otherAttacker.X, otherAttacker.Y))
                     {
-                        return new PlayerInstructions
+                        // Check if the pass is blocked by opponents
+                        var passTargetX = otherAttacker.X + 200;
+                        var passTargetY = otherAttacker.Y;
+                        
+                        var isPassBlocked = GeometryHelper.IsPassBlocked(
+                            playerStatus, 
+                            passTargetX, 
+                            passTargetY,
+                            gameStatus.OpponentStatus.P1Status,
+                            gameStatus.OpponentStatus.P2Status,
+                            gameStatus.OpponentStatus.P3Status,
+                            gameStatus.OpponentStatus.P4Status
+                        );
+                        
+                        if (!isPassBlocked)
                         {
-                            BallTargetX = otherAttacker.X + 200, // Lead the pass slightly
-                            BallTargetY = otherAttacker.Y,
-                            BallVelocity = 75
-                        };
+                            return new PlayerInstructions
+                            {
+                                BallTargetX = passTargetX,
+                                BallTargetY = passTargetY,
+                                BallVelocity = 75
+                            };
+                        }
                     }
                 }
                 
-                // If in good shooting position, shoot (with direction limitations)
-                if (playerStatus.X > 8000)
+                // If in reasonable shooting position, shoot
+                if (playerStatus.X > 7500)
                 {
                     var goalTarget = GeometryHelper.GetBestShootableTarget(playerStatus, 12000, 4500);
                     var shotVelocity = Math.Min(100, 50 + (Math.Abs(playerStatus.Vx) + Math.Abs(playerStatus.Vy)) / 20);
@@ -132,53 +174,125 @@ namespace FootballInstructor.Domain
                     };
                 }
 
-                // Otherwise, dribble towards goal
+                // Otherwise, dribble aggressively towards goal
                 return new PlayerInstructions
                 {
-                    MoveToX = Math.Min(11500, playerStatus.X + 500),
+                    MoveToX = Math.Min(11800, playerStatus.X + 800), // More aggressive dribbling
                     MoveToY = 4500,
-                    MoveVelocity = 80
+                    MoveVelocity = 90
                 };
             }
 
             // If we don't have the ball, get into good attacking position
             if (ourDistanceToBall < opponentDistanceToBall)
             {
-                // We have possession - position for pass or goal scoring
+                // We have possession - be MUCH more dynamic and aggressive
                 var ballCarrier = ourClosestToBall;
                 
-                // If ball is in attacking third, position for goal scoring/tap-ins
-                if (ballStatus.X > 8000)
+                // VERY CLOSE TO GOAL: Get into scoring position immediately
+                if (ballStatus.X > 9500)
                 {
-                    var goalAreaX = 11000 + (playerNumber - 3) * 500; // Spread around goal area
-                    var goalAreaY = 4500 + (playerNumber == 3 ? -800 : 800); // One high, one low
+                    // Both players should attack the goal from different angles
+                    var goalAreaX = 11500 + (playerNumber == 3 ? -200 : 200);
+                    var goalAreaY = 4500 + (playerNumber == 3 ? -600 : 600);
                     
                     return new PlayerInstructions
                     {
                         MoveToX = goalAreaX,
                         MoveToY = goalAreaY,
+                        MoveVelocity = 100 // Sprint to goal!
+                    };
+                }
+                
+                // ATTACKING THIRD: Smart positioning based on ball location
+                if (ballStatus.X > 8000)
+                {
+                    // If ball is wide, opposite player goes to center
+                    // If ball is central, players go wide
+                    int targetX, targetY;
+                    
+                    if (ballStatus.Y < 3000) // Ball is high up
+                    {
+                        targetX = playerNumber == 3 ? 10500 : 11000; // One closer, one at goal
+                        targetY = playerNumber == 3 ? 4500 : 6000;   // Center and low
+                    }
+                    else if (ballStatus.Y > 6000) // Ball is low down
+                    {
+                        targetX = playerNumber == 3 ? 10500 : 11000;
+                        targetY = playerNumber == 3 ? 3000 : 4500;   // High and center
+                    }
+                    else // Ball is central
+                    {
+                        targetX = 10800;
+                        targetY = playerNumber == 3 ? 3500 : 5500;   // Spread wide
+                    }
+                    
+                    return new PlayerInstructions
+                    {
+                        MoveToX = targetX,
+                        MoveToY = targetY,
                         MoveVelocity = 90
                     };
                 }
                 
-                // Otherwise, position for receiving passes
-                var passReceiveX = Math.Max(6000, ballStatus.X + 1500); // Ahead of ball
-                var passReceiveY = ballStatus.Y + (playerNumber == 3 ? -1500 : 1500); // Spread vertically
+                // MIDFIELD: Move up the field more aggressively
+                var passReceiveX = Math.Max(7000, ballStatus.X + 2000); // Much further ahead
+                var passReceiveY = ballStatus.Y + (playerNumber == 3 ? -1200 : 1200); // Better spread
                 
                 // Stay within field bounds
-                passReceiveY = Math.Max(1000, Math.Min(passReceiveY, 8000));
+                passReceiveY = Math.Max(1500, Math.Min(passReceiveY, 7500));
                 
                 return new PlayerInstructions
                 {
                     MoveToX = passReceiveX,
                     MoveToY = passReceiveY,
-                    MoveVelocity = 80
+                    MoveVelocity = 85
                 };
             }
             else
             {
-                // Opponents have ball, track back to help defense but stay forward
-                var targetX = Math.Max(6000, ballStatus.X - 1000);
+                // Opponents have ball - be more dynamic in helping defense
+                var distanceFromOwnGoal = GeometryHelper.Distance(playerStatus.X, playerStatus.Y, 0, 4500);
+                
+                // If ball is very close to our goal, both attackers help defend
+                if (ballStatus.X < 3000)
+                {
+                    var defensiveX = Math.Max(2000, ballStatus.X - 500);
+                    var defensiveY = playerNumber == 3 ? 3000 : 6000;
+                    
+                    return new PlayerInstructions
+                    {
+                        MoveToX = defensiveX,
+                        MoveToY = defensiveY,
+                        MoveVelocity = 90 // Sprint back to help!
+                    };
+                }
+                
+                // If ball is in midfield, one attacker drops back more, one stays forward
+                if (ballStatus.X < 6000)
+                {
+                    if (playerNumber == 3) // P3 drops back more
+                    {
+                        return new PlayerInstructions
+                        {
+                            MoveToX = Math.Max(4000, ballStatus.X - 800),
+                            MoveToY = ballStatus.Y - 500,
+                            MoveVelocity = 80
+                        };
+                    }
+                    else // P4 stays more forward for counter-attack
+                    {
+                        return new PlayerInstructions
+                        {
+                            MoveToX = 7000,
+                            MoveToY = 4500,
+                            MoveVelocity = 60
+                        };
+                    }
+                }
+                
+                // Ball is far away, maintain attacking positions but be ready
+                var targetX = Math.Max(6500, ballStatus.X - 500);
                 var targetY = playerNumber == 3 ? 3500 : 5500;
                 
                 return new PlayerInstructions
@@ -337,10 +451,23 @@ namespace FootballInstructor.Domain
                 
                 var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
                 
-                // Endast överväg lagkamrater som vi faktiskt kan passa till
+                // Endast överväg lagkamrater som vi faktiskt kan passa till OCH passen inte är blockerad
                 if (GeometryHelper.CanPlayerShootInDirection(currentPlayerStatus, teammate.X, teammate.Y))
                 {
-                    if (teammate.X > bestX)
+                    var passTargetX = teammate.X + 500;
+                    var passTargetY = teammate.Y;
+                    
+                    var isPassBlocked = GeometryHelper.IsPassBlocked(
+                        currentPlayerStatus,
+                        passTargetX,
+                        passTargetY,
+                        gameStatus.OpponentStatus.P1Status,
+                        gameStatus.OpponentStatus.P2Status,
+                        gameStatus.OpponentStatus.P3Status,
+                        gameStatus.OpponentStatus.P4Status
+                    );
+                    
+                    if (!isPassBlocked && teammate.X > bestX)
                     {
                         bestX = teammate.X;
                         bestTeammateFound = true;
@@ -372,10 +499,23 @@ namespace FootballInstructor.Domain
                 
                 var teammate = PlayerHelper.GetPlayerStatus(gameStatus, i);
                 
-                // Endast överväg lagkamrater som vi faktiskt kan passa till
+                // Endast överväg lagkamrater som vi faktiskt kan passa till OCH passen inte är blockerad
                 if (GeometryHelper.CanPlayerShootInDirection(currentPlayerStatus, teammate.X, teammate.Y))
                 {
-                    if (teammate.X > bestX)
+                    var passTargetX = teammate.X;
+                    var passTargetY = teammate.Y;
+                    
+                    var isPassBlocked = GeometryHelper.IsPassBlocked(
+                        currentPlayerStatus,
+                        passTargetX,
+                        passTargetY,
+                        gameStatus.OpponentStatus.P1Status,
+                        gameStatus.OpponentStatus.P2Status,
+                        gameStatus.OpponentStatus.P3Status,
+                        gameStatus.OpponentStatus.P4Status
+                    );
+                    
+                    if (!isPassBlocked && teammate.X > bestX)
                     {
                         bestX = teammate.X;
                         bestY = teammate.Y;
