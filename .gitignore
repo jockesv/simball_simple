@@ -144,3 +144,5 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+FootballInstructor/models/
+rl_model_instance_*.json

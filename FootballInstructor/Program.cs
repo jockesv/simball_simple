@@ -1,5 +1,6 @@
 
 using FootballInstructor.Domain;
+using FootballInstructor.Configuration;
 
 namespace FootballInstructor
 {
@@ -11,8 +12,24 @@ namespace FootballInstructor
 
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-            builder.Services.AddScoped<IPlayerService, PlayerService>();
+            // Configure AI settings
+            builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AISettings"));
+
+            // Add services to the container based on configuration
+            var aiSettings = builder.Configuration.GetSection("AISettings").Get<AISettings>() ?? new AISettings();
+            
+            Console.WriteLine($"Starting with AI Type: {aiSettings.AIType}");
+            
+            if (aiSettings.AIType == "ReinforcementLearning")
+            {
+                builder.Services.AddSingleton<IPlayerService, RLPlayerService>();
+                Console.WriteLine("Using Reinforcement Learning AI");
+            }
+            else
+            {
+                builder.Services.AddSingleton<IPlayerService, PlayerService>();
+                Console.WriteLine("Using Heuristic AI");
+            }
 
             builder.Services.AddCors(options =>
             {

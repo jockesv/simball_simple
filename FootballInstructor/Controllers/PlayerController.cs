@@ -38,4 +38,29 @@ public class PlayerController : ControllerBase
     {
         return "Response from server";
     }
+
+    [HttpGet]
+    [Route("force-save-model")]
+    public IActionResult ForceSaveModel()
+    {
+        try
+        {
+            if (playerService is RLPlayerService rlService)
+            {
+                var instanceId = rlService.GetInstanceId();
+                var modelPath = $"models/rl_model_instance_{instanceId}.json";
+                var ai = rlService.GetAI();
+                ai.SaveModel(modelPath);
+                return Ok($"Model saved for instance {instanceId} at {modelPath}");
+            }
+            else
+            {
+                return Ok("Not an RL service - no model to save");
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Error saving model: {ex.Message}");
+        }
+    }
 }
