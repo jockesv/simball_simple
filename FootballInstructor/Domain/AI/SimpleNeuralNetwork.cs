@@ -119,14 +119,16 @@ namespace FootballInstructor.Domain.AI
                 hidden2[j] = ReLU(hidden2[j]);
             }
 
-            // Output layer (using sigmoid for [0,1] bounded output)
+            // Output layer (linear output, bounded by decoder clipping)
             var output = new float[_outputSize];
             for (int j = 0; j < _outputSize; j++)
             {
                 output[j] = _biasOutput[j];
                 for (int i = 0; i < _hiddenSize2; i++)
                     output[j] += hidden2[i] * _weightsOutput[i, j];
-                output[j] = Sigmoid(output[j]);
+                
+                // Apply Tanh to keep outputs in [-1, 1] range, then rescale to [0, 1]
+                output[j] = (Tanh(output[j]) + 1f) * 0.5f;
             }
 
             return output;
@@ -159,7 +161,9 @@ namespace FootballInstructor.Domain.AI
                 output[j] = _biasOutput[j];
                 for (int i = 0; i < _hiddenSize2; i++)
                     output[j] += hidden2[i] * _weightsOutput[i, j];
-                output[j] = Sigmoid(output[j]);
+                
+                // Apply Tanh to keep outputs in [-1, 1] range, then rescale to [0, 1]
+                output[j] = (Tanh(output[j]) + 1f) * 0.5f;
             }
 
             // Backward pass
@@ -167,7 +171,10 @@ namespace FootballInstructor.Domain.AI
             var outputErrors = new float[_outputSize];
             for (int i = 0; i < _outputSize; i++)
             {
-                outputErrors[i] = (targetOutput[i] - output[i]) * SigmoidDerivative(output[i]);
+                // For scaled tanh: f(x) = (tanh(x) + 1) * 0.5, derivative is: 0.5 * (1 - tanh²(x))
+                float rawTanh = output[i] * 2f - 1f; // Convert back to [-1,1] tanh output
+                float tanhDerivative = 1f - rawTanh * rawTanh;
+                outputErrors[i] = (targetOutput[i] - output[i]) * 0.5f * tanhDerivative;
                 _gradBiasOutput[i] = -outputErrors[i];
                 
                 for (int j = 0; j < _hiddenSize2; j++)

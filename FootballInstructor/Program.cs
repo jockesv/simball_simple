@@ -20,15 +20,21 @@ namespace FootballInstructor
             
             Console.WriteLine($"Starting with AI Type: {aiSettings.AIType}");
             
-            if (aiSettings.AIType == "ReinforcementLearning")
+            switch (aiSettings.AIType.ToLower())
             {
-                builder.Services.AddSingleton<IPlayerService, RLPlayerService>();
-                Console.WriteLine("Using Reinforcement Learning AI");
-            }
-            else
-            {
-                builder.Services.AddSingleton<IPlayerService, PlayerService>();
-                Console.WriteLine("Using Heuristic AI");
+                case "reinforcementlearning":
+                    builder.Services.AddSingleton<IPlayerService, RLPlayerService>();
+                    Console.WriteLine("Using Reinforcement Learning AI");
+                    break;
+                case "ppo":
+                    builder.Services.AddSingleton<IPlayerService, PPOPlayerService>();
+                    Console.WriteLine("Using PPO AI");
+                    break;
+                case "heuristic":
+                default:
+                    builder.Services.AddSingleton<IPlayerService, PlayerService>();
+                    Console.WriteLine("Using Heuristic AI");
+                    break;
             }
 
             builder.Services.AddCors(options =>

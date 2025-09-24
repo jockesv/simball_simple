@@ -86,14 +86,14 @@ echo "Starting AI instances..."
 
 # Start RL AI Team 1 on port 5004
 echo "Starting RL AI Team 1 on port 5004..."
-AISettings__AIType="ReinforcementLearning" dotnet run --urls=http://localhost:5004 &
+dotnet run --urls=http://localhost:5004 &
 PID1=$!
 
 sleep 3
 
 # Start RL AI Team 2 on port 5002  
 echo "Starting RL AI Team 2 on port 5002..."
-AISettings__AIType="ReinforcementLearning" dotnet run --urls=http://localhost:5002 &
+dotnet run --urls=http://localhost:5002 &
 PID2=$!
 
 sleep 3
