@@ -95,13 +95,7 @@ namespace FootballInstructor.Domain.AI.PPO
 
         public TeamInstructions GetTeamInstructions(GameStatusExtended gameStatus)
         {
-            // Handle game resets (new game or kickoff)
-            if (gameStatus.KickoffSinceLastUpdate || _previousGameState == null)
-            {
-                HandleGameReset(gameStatus);
-            }
-            
-            // Process previous experience if we have it
+            // Process previous experience FIRST if we have it (before any reset clears it)
             if (_previousGameState != null && _previousAction != null)
             {
                 var reward = _rewardCalculator.CalculateReward(_previousGameState, _previousAction, gameStatus);
@@ -111,11 +105,23 @@ namespace FootballInstructor.Domain.AI.PPO
                 if (_recentRewards.Count > 100)
                     _recentRewards.RemoveAt(0);
                 
+                // Debug: Show non-zero rewards
+                if (reward != 0 && _settings.EnableLogging)
+                {
+                    Console.WriteLine($"[PPO-{_instanceId}] Step reward: {reward:F4} (Steps in episode: {_currentTrajectory.Experiences.Count})");
+                }
+                
                 // Check for game end
                 if (gameStatus.YouScored || gameStatus.OpponentScored)
                 {
                     HandleGameEnd(gameStatus);
                 }
+            }
+            
+            // Handle game resets AFTER processing previous experience
+            if (gameStatus.KickoffSinceLastUpdate || _previousGameState == null)
+            {
+                HandleGameReset(gameStatus);
             }
             
             // Get action using PPO policy or teacher
@@ -223,7 +229,7 @@ namespace FootballInstructor.Domain.AI.PPO
             
             var avgReward = _recentRewards.Count > 0 ? _recentRewards.Average() : 0;
             Console.WriteLine($"PPO Instance {_instanceId} - Game ended. Score: {gameStatus.YourScore}-{gameStatus.OpponentScore}, " +
-                            $"Avg reward: {avgReward:F2}, Win rate: {GetWinRate():F2}%, " +
+                            $"Avg reward: {avgReward:F6}, Win rate: {GetWinRate():F2}%, " +
                             $"Temperature: {_currentTemperature:F3}, Trajectories: {_buffer.TrajectoryCount}");
             
             // Decay exploration temperature
