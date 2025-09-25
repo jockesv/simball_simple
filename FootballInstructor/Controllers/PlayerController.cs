@@ -51,11 +51,19 @@ public class PlayerController : ControllerBase
                 var modelPath = $"models/rl_model_instance_{instanceId}.json";
                 var ai = rlService.GetAI();
                 ai.SaveModel(modelPath);
-                return Ok($"Model saved for instance {instanceId} at {modelPath}");
+                return Ok($"RL Model saved for instance {instanceId} at {modelPath}");
+            }
+            else if (playerService is PPOPlayerService ppoService)
+            {
+                var instanceId = ppoService.GetInstanceId();
+                var modelPath = $"models/rl_model_instance_{instanceId}.json";
+                var ai = ppoService.GetAI();
+                ai.SaveModel(modelPath);
+                return Ok($"PPO Model saved for instance {instanceId} at {modelPath}");
             }
             else
             {
-                return Ok("Not an RL service - no model to save");
+                return Ok("Not an RL/PPO service - no model to save");
             }
         }
         catch (Exception ex)

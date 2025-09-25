@@ -69,10 +69,10 @@ fi
 
 echo ""
 echo "Checking for existing models..."
-if [ -f "models/rl_model_instance_1.json" ]; then
-    echo "✓ Found existing model for Team 1 - will continue training"
+if [ -f "models/rl_model_instance_4.json" ]; then
+    echo "✓ Found existing model for Team 4 - will continue training"
 else
-    echo "• No existing model for Team 1 - starting fresh"
+    echo "• No existing model for Team 4 - starting fresh"
 fi
 
 if [ -f "models/rl_model_instance_2.json" ]; then

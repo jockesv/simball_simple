@@ -195,6 +195,20 @@ namespace FootballInstructor.Domain.AI.PPO
             
             return logProb;
         }
+        
+        // Weight serialization methods for model saving
+        public float[,] GetWeightsInput() => _network.GetWeightsInput();
+        public float[] GetBiasHidden1() => _network.GetBiasHidden1();
+        public float[,] GetWeightsHidden1() => _network.GetWeightsHidden1();
+        public float[] GetBiasHidden2() => _network.GetBiasHidden2();
+        public float[,] GetWeightsOutput() => _network.GetWeightsOutput();
+        public float[] GetBiasOutput() => _network.GetBiasOutput();
+        
+        public void SetWeights(float[,] weightsInput, float[] biasHidden1, float[,] weightsHidden1, 
+                              float[] biasHidden2, float[,] weightsOutput, float[] biasOutput)
+        {
+            _network.SetWeights(weightsInput, biasHidden1, weightsHidden1, biasHidden2, weightsOutput, biasOutput);
+        }
     }
 
     /// <summary>
@@ -221,6 +235,20 @@ namespace FootballInstructor.Domain.AI.PPO
         {
             var target = new float[] { targetValue };
             _network.BackwardAndUpdate(state, target);
+        }
+        
+        // Weight serialization methods for model saving
+        public float[,] GetWeightsInput() => _network.GetWeightsInput();
+        public float[] GetBiasHidden1() => _network.GetBiasHidden1();
+        public float[,] GetWeightsHidden1() => _network.GetWeightsHidden1();
+        public float[] GetBiasHidden2() => _network.GetBiasHidden2();
+        public float[,] GetWeightsOutput() => _network.GetWeightsOutput();
+        public float[] GetBiasOutput() => _network.GetBiasOutput();
+        
+        public void SetWeights(float[,] weightsInput, float[] biasHidden1, float[,] weightsHidden1, 
+                              float[] biasHidden2, float[,] weightsOutput, float[] biasOutput)
+        {
+            _network.SetWeights(weightsInput, biasHidden1, weightsHidden1, biasHidden2, weightsOutput, biasOutput);
         }
     }
 }
