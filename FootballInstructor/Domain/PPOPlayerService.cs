@@ -100,13 +100,23 @@ namespace FootballInstructor.Domain
         {
             return new PlayerInstructions
             {
-                MoveToX = Math.Clamp(instructions.MoveToX, 0, 12000),
-                MoveToY = Math.Clamp(instructions.MoveToY, 0, 9000),
-                MoveVelocity = Math.Clamp(instructions.MoveVelocity, 0, 100),
-                BallTargetX = Math.Clamp(instructions.BallTargetX, 0, 12000),
-                BallTargetY = Math.Clamp(instructions.BallTargetY, 0, 9000),
-                BallVelocity = Math.Clamp(instructions.BallVelocity, 0, 100)
+                MoveToX = (int)ClampAndValidate(instructions.MoveToX, 0, 12000, 6000),
+                MoveToY = (int)ClampAndValidate(instructions.MoveToY, 0, 9000, 4500),
+                MoveVelocity = (int)ClampAndValidate(instructions.MoveVelocity, 0, 100, 50),
+                BallTargetX = (int)ClampAndValidate(instructions.BallTargetX, 0, 12000, 12000),
+                BallTargetY = (int)ClampAndValidate(instructions.BallTargetY, 0, 9000, 4500),
+                BallVelocity = (int)ClampAndValidate(instructions.BallVelocity, 0, 100, 70)
             };
+        }
+        
+        private float ClampAndValidate(float value, float min, float max, float defaultValue)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                Console.WriteLine($"[PPO] Invalid value detected: {value}, using default: {defaultValue}");
+                return defaultValue;
+            }
+            return Math.Clamp(value, min, max);
         }
 
         private TeamInstructions GetFallbackInstructions(GameStatusExtended gameStatus)

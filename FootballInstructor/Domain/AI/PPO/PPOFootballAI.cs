@@ -171,7 +171,7 @@ namespace FootballInstructor.Domain.AI.PPO
             // Calculate log probability for PPO training
             _previousLogProb = _policyNetwork.CalculateLogProb(state, sampledAction);
             
-            if (_settings.EnableLogging && _stepCount % 40 == 0)
+            if (_settings.EnableLogging && _stepCount % 5 == 0)
             {
                 Console.WriteLine($"[PPO] P1 move: ({decodedAction.P1Instructions.MoveToX},{decodedAction.P1Instructions.MoveToY}) vel:{decodedAction.P1Instructions.MoveVelocity}");
             }
@@ -272,34 +272,8 @@ namespace FootballInstructor.Domain.AI.PPO
             {
                 if (exp.LogProb < 0) continue; // Skip teacher actions
                 
-                // Calculate current policy log prob
-                var currentLogProb = _policyNetwork.CalculateLogProb(exp.State, exp.Action);
-                
-                // PPO ratio
-                var ratio = (float)Math.Exp(currentLogProb - exp.LogProb);
-                var clippedRatio = Math.Clamp(ratio, 1 - CLIP_EPSILON, 1 + CLIP_EPSILON);
-                
-                // PPO loss (simplified - we approximate with advantage-weighted update)
-                if (exp.Advantage > 0 && ratio < 1 + CLIP_EPSILON)
-                {
-                    // Increase probability of good actions
-                    var target = exp.Action.ToArray();
-                    for (int i = 0; i < target.Length; i++)
-                    {
-                        target[i] = Math.Clamp(target[i] + 0.01f * exp.Advantage, 0f, 1f);
-                    }
-                    _policyNetwork.BackwardAndUpdate(exp.State, target);
-                }
-                else if (exp.Advantage < 0 && ratio > 1 - CLIP_EPSILON)
-                {
-                    // Decrease probability of bad actions
-                    var target = exp.Action.ToArray();
-                    for (int i = 0; i < target.Length; i++)
-                    {
-                        target[i] = Math.Clamp(target[i] + 0.01f * exp.Advantage, 0f, 1f);
-                    }
-                    _policyNetwork.BackwardAndUpdate(exp.State, target);
-                }
+                // Use proper PPO clipped objective gradient update (fixed parameter order)
+                _policyNetwork.UpdatePolicyGradient(exp.State, exp.Action, exp.Advantage, exp.LogProb);
             }
         }
 
