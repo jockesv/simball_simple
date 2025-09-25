@@ -1,5 +1,11 @@
 namespace FootballInstructor.Domain.AI
 {
+    public enum OutputActivation
+    {
+        ScaledTanh,  // (tanh(x) + 1) * 0.5 - for bounded outputs [0,1]
+        Identity     // Linear output - for unbounded outputs (values)
+    }
+
     public class SimpleNeuralNetwork
     {
         private readonly int _inputSize;
@@ -7,6 +13,7 @@ namespace FootballInstructor.Domain.AI
         private readonly int _hiddenSize2;
         private readonly int _outputSize;
         private readonly Random _random;
+        private readonly OutputActivation _outputActivation;
 
         // Weights and biases
         private float[,] _weightsInput;
@@ -37,7 +44,8 @@ namespace FootballInstructor.Domain.AI
         private float[] _prevGradBiasOutput;
 
         public SimpleNeuralNetwork(int inputSize, int hiddenSize1, int hiddenSize2, int outputSize, 
-            float learningRate = 0.001f, float momentum = 0.9f, int? seed = null)
+            float learningRate = 0.001f, float momentum = 0.9f, int? seed = null, 
+            OutputActivation outputActivation = OutputActivation.ScaledTanh)
         {
             _inputSize = inputSize;
             _hiddenSize1 = hiddenSize1;
@@ -45,6 +53,7 @@ namespace FootballInstructor.Domain.AI
             _outputSize = outputSize;
             _learningRate = learningRate;
             _momentum = momentum;
+            _outputActivation = outputActivation;
             _random = seed.HasValue ? new Random(seed.Value) : new Random();
 
             InitializeWeights();
@@ -119,7 +128,7 @@ namespace FootballInstructor.Domain.AI
                 hidden2[j] = ReLU(hidden2[j]);
             }
 
-            // Output layer (linear output, bounded by decoder clipping)
+            // Output layer with configurable activation
             var output = new float[_outputSize];
             for (int j = 0; j < _outputSize; j++)
             {
@@ -127,8 +136,17 @@ namespace FootballInstructor.Domain.AI
                 for (int i = 0; i < _hiddenSize2; i++)
                     output[j] += hidden2[i] * _weightsOutput[i, j];
                 
-                // Apply Tanh to keep outputs in [-1, 1] range, then rescale to [0, 1]
-                output[j] = (Tanh(output[j]) + 1f) * 0.5f;
+                // Apply activation based on network type
+                switch (_outputActivation)
+                {
+                    case OutputActivation.ScaledTanh:
+                        // Apply Tanh to keep outputs in [-1, 1] range, then rescale to [0, 1]
+                        output[j] = (Tanh(output[j]) + 1f) * 0.5f;
+                        break;
+                    case OutputActivation.Identity:
+                        // Linear output - no activation (for value networks)
+                        break;
+                }
             }
 
             return output;
@@ -162,8 +180,16 @@ namespace FootballInstructor.Domain.AI
                 for (int i = 0; i < _hiddenSize2; i++)
                     output[j] += hidden2[i] * _weightsOutput[i, j];
                 
-                // Apply Tanh to keep outputs in [-1, 1] range, then rescale to [0, 1]
-                output[j] = (Tanh(output[j]) + 1f) * 0.5f;
+                // Apply activation based on network type (must match forward pass)
+                switch (_outputActivation)
+                {
+                    case OutputActivation.ScaledTanh:
+                        output[j] = (Tanh(output[j]) + 1f) * 0.5f;
+                        break;
+                    case OutputActivation.Identity:
+                        // Linear output - no activation
+                        break;
+                }
             }
 
             // Backward pass
@@ -171,10 +197,23 @@ namespace FootballInstructor.Domain.AI
             var outputErrors = new float[_outputSize];
             for (int i = 0; i < _outputSize; i++)
             {
-                // For scaled tanh: f(x) = (tanh(x) + 1) * 0.5, derivative is: 0.5 * (1 - tanh²(x))
-                float rawTanh = output[i] * 2f - 1f; // Convert back to [-1,1] tanh output
-                float tanhDerivative = 1f - rawTanh * rawTanh;
-                outputErrors[i] = (targetOutput[i] - output[i]) * 0.5f * tanhDerivative;
+                float derivative;
+                switch (_outputActivation)
+                {
+                    case OutputActivation.ScaledTanh:
+                        // For scaled tanh: f(x) = (tanh(x) + 1) * 0.5, derivative is: 0.5 * (1 - tanh²(x))
+                        float rawTanh = output[i] * 2f - 1f; // Convert back to [-1,1] tanh output
+                        derivative = 0.5f * (1f - rawTanh * rawTanh);
+                        break;
+                    case OutputActivation.Identity:
+                        // Linear output derivative is 1
+                        derivative = 1f;
+                        break;
+                    default:
+                        derivative = 1f;
+                        break;
+                }
+                outputErrors[i] = (targetOutput[i] - output[i]) * derivative;
                 _gradBiasOutput[i] = -outputErrors[i];
                 
                 for (int j = 0; j < _hiddenSize2; j++)
@@ -306,7 +345,8 @@ namespace FootballInstructor.Domain.AI
 
         public SimpleNeuralNetwork Clone()
         {
-            var clone = new SimpleNeuralNetwork(_inputSize, _hiddenSize1, _hiddenSize2, _outputSize, _learningRate, _momentum);
+            var clone = new SimpleNeuralNetwork(_inputSize, _hiddenSize1, _hiddenSize2, _outputSize, 
+                _learningRate, _momentum, null, _outputActivation);
             
             Array.Copy(_weightsInput, clone._weightsInput, _weightsInput.Length);
             Array.Copy(_biasHidden1, clone._biasHidden1, _biasHidden1.Length);

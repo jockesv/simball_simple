@@ -12,8 +12,9 @@ namespace FootballInstructor.Domain.AI.PPO
 
         public PolicyNetwork(int inputSize, int hiddenSize1, int hiddenSize2, int outputSize, float learningRate = 0.0005f, int? seed = null)
         {
-            // Reduced learning rate for more stable training
-            _network = new SimpleNeuralNetwork(inputSize, hiddenSize1, hiddenSize2, outputSize, learningRate, 0.9f, seed);
+            // Policy network uses ScaledTanh for bounded action outputs [0,1]
+            _network = new SimpleNeuralNetwork(inputSize, hiddenSize1, hiddenSize2, outputSize, 
+                learningRate, 0.9f, seed, OutputActivation.ScaledTanh);
             _random = seed.HasValue ? new Random(seed.Value) : new Random();
         }
 
@@ -74,8 +75,9 @@ namespace FootballInstructor.Domain.AI.PPO
 
         public ValueNetwork(int inputSize, int hiddenSize1, int hiddenSize2, float learningRate = 0.0005f, int? seed = null)
         {
-            // Value network outputs single value - reduced learning rate for stability
-            _network = new SimpleNeuralNetwork(inputSize, hiddenSize1, hiddenSize2, 1, learningRate, 0.9f, seed);
+            // Value network uses Identity activation for unbounded value outputs
+            _network = new SimpleNeuralNetwork(inputSize, hiddenSize1, hiddenSize2, 1, 
+                learningRate, 0.9f, seed, OutputActivation.Identity);
         }
 
         public float EstimateValue(float[] state)
