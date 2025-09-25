@@ -32,21 +32,37 @@ namespace FootballInstructor.Domain.AI.PPO
         
         private float GenerateGaussian()
         {
-            // Box-Muller transform for standard normal distribution
+            // Robust Box-Muller transform with protections against u1 == 0 producing Inf/NaN
             if (_hasSpareGaussian)
             {
                 _hasSpareGaussian = false;
+                if (float.IsNaN(_spareGaussian) || float.IsInfinity(_spareGaussian))
+                {
+                    // Regenerate if corrupted
+                    return GenerateGaussian();
+                }
                 return _spareGaussian;
             }
-            
+
+            float u1, u2;
+            do
+            {
+                u1 = (float)_random.NextDouble(); // (0,1)
+            } while (u1 < 1e-8f); // avoid log(0)
+            u2 = (float)_random.NextDouble();
+
+            float mag = (float)Math.Sqrt(-2.0f * Math.Log(u1));
+            float theta = 2.0f * (float)Math.PI * u2;
+            float z0 = mag * (float)Math.Cos(theta);
+            float z1 = mag * (float)Math.Sin(theta);
+
+            // Guard against Inf * 0 -> NaN
+            if (float.IsNaN(z0) || float.IsInfinity(z0)) z0 = 0f;
+            if (float.IsNaN(z1) || float.IsInfinity(z1)) z1 = 0f;
+
+            _spareGaussian = z1;
             _hasSpareGaussian = true;
-            float u1 = (float)_random.NextDouble();
-            float u2 = (float)_random.NextDouble();
-            
-            float mag = (float)(Math.Sqrt(-2.0 * Math.Log(u1)));
-            _spareGaussian = mag * (float)Math.Cos(2.0 * Math.PI * u2);
-            
-            return mag * (float)Math.Sin(2.0 * Math.PI * u2);
+            return z0;
         }
 
         /// <summary>
@@ -80,8 +96,19 @@ namespace FootballInstructor.Domain.AI.PPO
             var target = new float[currentOutput.Length];
             for (int i = 0; i < currentOutput.Length; i++)
             {
-                var dir = Math.Sign(weight) * (action[i] - currentOutput[i]); // move toward/away from the taken action
-                target[i] = currentOutput[i] + 0.05f * dir;                  // small step
+                // Skip invalid action components
+                if (float.IsNaN(action[i]) || float.IsInfinity(action[i]))
+                {
+                    action[i] = 0.5f;
+                }
+
+                var dir = Math.Sign(weight) * (action[i] - currentOutput[i]);
+                // Scale step by output variance term to reduce saturation pushing
+                var varianceFactor = currentOutput[i] * (1f - currentOutput[i]); // in [0,0.25]
+                var stepSize = 0.05f * varianceFactor; // shrinks near 0/1
+                if (stepSize < 0.0005f) stepSize = 0.0005f;
+                target[i] = currentOutput[i] + stepSize * dir;
+                if (!float.IsFinite(target[i])) target[i] = 0.5f;
                 target[i] = Math.Clamp(target[i], 0f, 1f);
             }
             
@@ -123,9 +150,11 @@ namespace FootballInstructor.Domain.AI.PPO
                 
                 // Apply tanh squashing: a = tanh(u) ∈ (-1,1)
                 var a_tanh = (float)Math.Tanh(u);
+                if (float.IsNaN(a_tanh)) a_tanh = 0f;
                 
                 // Map to [0,1]: (a+1)/2
                 sampledAction[i] = (a_tanh + 1f) * 0.5f;
+                if (!float.IsFinite(sampledAction[i])) sampledAction[i] = 0.5f;
             }
             
             return sampledAction;

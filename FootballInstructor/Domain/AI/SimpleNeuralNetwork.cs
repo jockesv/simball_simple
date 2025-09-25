@@ -256,67 +256,61 @@ namespace FootballInstructor.Domain.AI
 
         private void UpdateWeights()
         {
-            // Update input to hidden1 weights
+            // Update input to hidden1 weights - FIXED: proper gradient descent
             for (int i = 0; i < _inputSize; i++)
             {
                 for (int j = 0; j < _hiddenSize1; j++)
                 {
-                    var momentum = _momentum * _prevGradWeightsInput[i, j];
-                    var update = _learningRate * _gradWeightsInput[i, j] + momentum;
-                    _weightsInput[i, j] += update;
-                    _prevGradWeightsInput[i, j] = update;
+                    var velocity = _momentum * _prevGradWeightsInput[i, j] - _learningRate * _gradWeightsInput[i, j];
+                    _weightsInput[i, j] += velocity;
+                    _prevGradWeightsInput[i, j] = velocity;
                 }
             }
 
-            // Update hidden1 bias
+            // Update hidden1 bias - FIXED: proper gradient descent
             for (int i = 0; i < _hiddenSize1; i++)
             {
-                var momentum = _momentum * _prevGradBiasHidden1[i];
-                var update = _learningRate * _gradBiasHidden1[i] + momentum;
-                _biasHidden1[i] += update;
-                _prevGradBiasHidden1[i] = update;
+                var velocity = _momentum * _prevGradBiasHidden1[i] - _learningRate * _gradBiasHidden1[i];
+                _biasHidden1[i] += velocity;
+                _prevGradBiasHidden1[i] = velocity;
             }
 
-            // Update hidden1 to hidden2 weights
+            // Update hidden1 to hidden2 weights - FIXED: proper gradient descent
             for (int i = 0; i < _hiddenSize1; i++)
             {
                 for (int j = 0; j < _hiddenSize2; j++)
                 {
-                    var momentum = _momentum * _prevGradWeightsHidden1[i, j];
-                    var update = _learningRate * _gradWeightsHidden1[i, j] + momentum;
-                    _weightsHidden1[i, j] += update;
-                    _prevGradWeightsHidden1[i, j] = update;
+                    var velocity = _momentum * _prevGradWeightsHidden1[i, j] - _learningRate * _gradWeightsHidden1[i, j];
+                    _weightsHidden1[i, j] += velocity;
+                    _prevGradWeightsHidden1[i, j] = velocity;
                 }
             }
 
-            // Update hidden2 bias
+            // Update hidden2 bias - FIXED: proper gradient descent
             for (int i = 0; i < _hiddenSize2; i++)
             {
-                var momentum = _momentum * _prevGradBiasHidden2[i];
-                var update = _learningRate * _gradBiasHidden2[i] + momentum;
-                _biasHidden2[i] += update;
-                _prevGradBiasHidden2[i] = update;
+                var velocity = _momentum * _prevGradBiasHidden2[i] - _learningRate * _gradBiasHidden2[i];
+                _biasHidden2[i] += velocity;
+                _prevGradBiasHidden2[i] = velocity;
             }
 
-            // Update hidden2 to output weights
+            // Update hidden2 to output weights - FIXED: proper gradient descent
             for (int i = 0; i < _hiddenSize2; i++)
             {
                 for (int j = 0; j < _outputSize; j++)
                 {
-                    var momentum = _momentum * _prevGradWeightsOutput[i, j];
-                    var update = _learningRate * _gradWeightsOutput[i, j] + momentum;
-                    _weightsOutput[i, j] += update;
-                    _prevGradWeightsOutput[i, j] = update;
+                    var velocity = _momentum * _prevGradWeightsOutput[i, j] - _learningRate * _gradWeightsOutput[i, j];
+                    _weightsOutput[i, j] += velocity;
+                    _prevGradWeightsOutput[i, j] = velocity;
                 }
             }
 
-            // Update output bias
+            // Update output bias - FIXED: proper gradient descent
             for (int i = 0; i < _outputSize; i++)
             {
-                var momentum = _momentum * _prevGradBiasOutput[i];
-                var update = _learningRate * _gradBiasOutput[i] + momentum;
-                _biasOutput[i] += update;
-                _prevGradBiasOutput[i] = update;
+                var velocity = _momentum * _prevGradBiasOutput[i] - _learningRate * _gradBiasOutput[i];
+                _biasOutput[i] += velocity;
+                _prevGradBiasOutput[i] = velocity;
             }
         }
 
