@@ -1,0 +1,303 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "SimballApiPlayer",
+    "version": "1.0"
+  },
+  "paths": {
+    "/Player/update": {
+      "post": {
+        "tags": [
+          "Player"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameStatusExtended"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameStatusExtended"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameStatusExtended"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInstructions"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInstructions"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInstructions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Player/setup": {
+      "get": {
+        "tags": [
+          "Player"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamSetup"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamSetup"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamSetup"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Player": {
+      "get": {
+        "tags": [
+          "Player"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BallStatus": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vx": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vy": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GameStatusExtended": {
+        "type": "object",
+        "properties": {
+          "yourStatus": {
+            "$ref": "#/components/schemas/GameTeamStatus"
+          },
+          "opponentStatus": {
+            "$ref": "#/components/schemas/GameTeamStatus"
+          },
+          "ballStatus": {
+            "$ref": "#/components/schemas/BallStatus"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "youScored": {
+            "type": "boolean"
+          },
+          "opponentScored": {
+            "type": "boolean"
+          },
+          "kickoffSinceLastUpdate": {
+            "type": "boolean"
+          },
+          "timeLeftMS": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "yourScore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "opponentScore": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GameTeamStatus": {
+        "type": "object",
+        "properties": {
+          "p1Status": {
+            "$ref": "#/components/schemas/PlayerStatus"
+          },
+          "p2Status": {
+            "$ref": "#/components/schemas/PlayerStatus"
+          },
+          "p3Status": {
+            "$ref": "#/components/schemas/PlayerStatus"
+          },
+          "p4Status": {
+            "$ref": "#/components/schemas/PlayerStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlayerInstructions": {
+        "type": "object",
+        "properties": {
+          "moveToX": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "moveToY": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "moveVelocity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ballTargetX": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ballTargetY": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ballVelocity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlayerStatus": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vx": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vy": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TeamColors": {
+        "type": "object",
+        "properties": {
+          "jearsey": {
+            "type": "string",
+            "nullable": true
+          },
+          "pants": {
+            "type": "string",
+            "nullable": true
+          },
+          "socks": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TeamInstructions": {
+        "type": "object",
+        "properties": {
+          "p1Instructions": {
+            "$ref": "#/components/schemas/PlayerInstructions"
+          },
+          "p2Instructions": {
+            "$ref": "#/components/schemas/PlayerInstructions"
+          },
+          "p3Instructions": {
+            "$ref": "#/components/schemas/PlayerInstructions"
+          },
+          "p4Instructions": {
+            "$ref": "#/components/schemas/PlayerInstructions"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TeamSetup": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryColor": {
+            "$ref": "#/components/schemas/TeamColors"
+          },
+          "secondaryColor": {
+            "$ref": "#/components/schemas/TeamColors"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
