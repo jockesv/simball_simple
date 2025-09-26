@@ -8,17 +8,74 @@ namespace FootballInstructor.Domain.AI
         private float _previousDistanceToBall = float.MaxValue;
         private int _previousBallX = 0;
         private Dictionary<int, (int X, int Y)> _previousPlayerPositions = new();
+        private int? _lastYourScore;
+        private int? _lastOpponentScore;
+        private bool _pendingYourGoal;
+        private bool _pendingOpponentGoal;
 
         public float CalculateReward(GameStatusExtended gameState, TeamInstructions action, GameStatusExtended? nextState = null)
         {
             // Minimalistic reward shaping: only goals and direct ball interaction
             float reward = 0;
 
-            // Goals
-            if (gameState.YouScored)
+            // Goals - detect via score deltas and fall back to transient flags
+            var next = nextState ?? gameState;
+            var latestYourScore = next.YourScore;
+            var latestOpponentScore = next.OpponentScore;
+            var previousYourScore = _lastYourScore ?? gameState.YourScore;
+            var previousOpponentScore = _lastOpponentScore ?? gameState.OpponentScore;
+
+            var yourScoreDelta = latestYourScore - previousYourScore;
+            var opponentScoreDelta = latestOpponentScore - previousOpponentScore;
+
+            var youScoredFlag = next.YouScored || gameState.YouScored;
+            var opponentScoredFlag = next.OpponentScored || gameState.OpponentScored;
+
+            if (yourScoreDelta > 0)
+            {
+                if (_pendingYourGoal)
+                {
+                    // Already rewarded via flag, add remaining delta beyond the first goal if needed
+                    reward += 100f * Math.Max(0, yourScoreDelta - 1);
+                    _pendingYourGoal = false;
+                }
+                else
+                {
+                    reward += 100f * yourScoreDelta;
+                }
+            }
+            else if (yourScoreDelta == 0 && youScoredFlag && !_pendingYourGoal)
+            {
+                // Flag fired before scoreboard updated - reward once and wait for score to catch up
                 reward += 100f;
-            if (gameState.OpponentScored)
+                _pendingYourGoal = true;
+            }
+
+            if (opponentScoreDelta > 0)
+            {
+                if (_pendingOpponentGoal)
+                {
+                    reward -= 100f * Math.Max(0, opponentScoreDelta - 1);
+                    _pendingOpponentGoal = false;
+                }
+                else
+                {
+                    reward -= 100f * opponentScoreDelta;
+                }
+            }
+            else if (opponentScoreDelta == 0 && opponentScoredFlag && !_pendingOpponentGoal)
+            {
                 reward -= 100f;
+                _pendingOpponentGoal = true;
+            }
+
+            if (!youScoredFlag)
+                _pendingYourGoal = false;
+            if (!opponentScoredFlag)
+                _pendingOpponentGoal = false;
+
+            _lastYourScore = latestYourScore;
+            _lastOpponentScore = latestOpponentScore;
 
             // Direct ball interaction
             // - Touch: any of our players within small radius of the ball
@@ -472,6 +529,10 @@ namespace FootballInstructor.Domain.AI
             _previousDistanceToBall = float.MaxValue;
             _previousBallX = 0;
             _previousPlayerPositions.Clear();
+            _lastYourScore = null;
+            _lastOpponentScore = null;
+            _pendingYourGoal = false;
+            _pendingOpponentGoal = false;
         }
     }
 }
