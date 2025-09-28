@@ -241,7 +241,7 @@ namespace FootballInstructor.Domain.AI.PPO
             
             if (shouldSave)
             {
-                SaveModel(_modelPath);
+                //SaveModel(_modelPath);
             }
         }
 
@@ -504,15 +504,88 @@ namespace FootballInstructor.Domain.AI.PPO
         {
             try
             {
-                // For now, skip complex deserialization to avoid JSON complexity
-                // The network will start from random initialization
-                // TODO: Implement proper 2D array deserialization if needed
-                Console.WriteLine($"PPO Instance {_instanceId} - Network weight loading skipped (using random initialization)");
+                // Expect structure with: WeightsInput (jagged), BiasHidden1, WeightsHidden1, BiasHidden2, WeightsOutput, BiasOutput
+                if (!element.TryGetProperty("WeightsInput", out var wInputEl) ||
+                    !element.TryGetProperty("BiasHidden1", out var bH1El) ||
+                    !element.TryGetProperty("WeightsHidden1", out var wH1El) ||
+                    !element.TryGetProperty("BiasHidden2", out var bH2El) ||
+                    !element.TryGetProperty("WeightsOutput", out var wOutEl) ||
+                    !element.TryGetProperty("BiasOutput", out var bOutEl))
+                {
+                    Console.WriteLine($"PPO Instance {_instanceId} - Incomplete weight data in model file, keeping random initialization");
+                    return;
+                }
+
+                var weightsInput = ConvertJaggedTo2D(wInputEl);
+                var biasHidden1 = ConvertTo1DArray(bH1El);
+                var weightsHidden1 = ConvertJaggedTo2D(wH1El);
+                var biasHidden2 = ConvertTo1DArray(bH2El);
+                var weightsOutput = ConvertJaggedTo2D(wOutEl);
+                var biasOutput = ConvertTo1DArray(bOutEl);
+
+                // Basic sanity checks – empty arrays mean something went wrong
+                if (weightsInput.Length == 0 || weightsHidden1.Length == 0 || weightsOutput.Length == 0)
+                {
+                    Console.WriteLine($"PPO Instance {_instanceId} - Parsed empty weight matrices, aborting load");
+                    return;
+                }
+
+                // Apply weights
+                network.SetWeights(weightsInput, biasHidden1, weightsHidden1, biasHidden2, weightsOutput, biasOutput);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"PPO Instance {_instanceId} - Error loading network weights: {ex.Message}");
             }
+        }
+
+        // Helper: convert JSON jagged array ([[..],[..]]) to 2D float[,]
+        private float[,] ConvertJaggedTo2D(System.Text.Json.JsonElement jaggedElement)
+        {
+            if (jaggedElement.ValueKind != System.Text.Json.JsonValueKind.Array) return new float[0,0];
+            var rows = jaggedElement.GetArrayLength();
+            if (rows == 0) return new float[0,0];
+            int cols = -1;
+            // Determine column count from first row
+            for (int i = 0; i < rows; i++)
+            {
+                var rowEl = jaggedElement[i];
+                if (rowEl.ValueKind != System.Text.Json.JsonValueKind.Array) return new float[0,0];
+                if (cols == -1) cols = rowEl.GetArrayLength();
+                else if (rowEl.GetArrayLength() != cols)
+                {
+                    Console.WriteLine($"PPO Instance {_instanceId} - Jagged array row length mismatch when loading weights");
+                    return new float[0,0];
+                }
+            }
+            var result = new float[rows, cols];
+            for (int i = 0; i < rows; i++)
+            {
+                var rowEl = jaggedElement[i];
+                int j = 0;
+                foreach (var num in rowEl.EnumerateArray())
+                {
+                    if (num.ValueKind == System.Text.Json.JsonValueKind.Number && num.TryGetSingle(out var v))
+                        result[i, j] = v;
+                    j++;
+                }
+            }
+            return result;
+        }
+
+        // Helper: convert JSON numeric array to float[]
+        private float[] ConvertTo1DArray(System.Text.Json.JsonElement arrayElement)
+        {
+            if (arrayElement.ValueKind != System.Text.Json.JsonValueKind.Array) return Array.Empty<float>();
+            var arr = new float[arrayElement.GetArrayLength()];
+            int idx = 0;
+            foreach (var num in arrayElement.EnumerateArray())
+            {
+                if (num.ValueKind == System.Text.Json.JsonValueKind.Number && num.TryGetSingle(out var v))
+                    arr[idx] = v;
+                idx++;
+            }
+            return arr;
         }
 
         /// <summary>
